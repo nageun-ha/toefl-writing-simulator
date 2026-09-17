@@ -253,15 +253,36 @@ class TOEFLSimulator:
         self.text_area.bind("<Control-MouseWheel>", self._on_ctrl_wheel)
 
         # 복사/붙여넣기 차단
-        for seq in ("<Control-c>", "<Control-v>", "<Control-x>",
-                    "<Command-c>", "<Command-v>", "<Command-x>"):
-            self.text_area.bind(seq, lambda e: "break")
+        # Ctrl+C/V/X 같은 키 조합이나 그로 인해 파생되는 <<Copy>>/<<Paste>>
+        # 가상 이벤트를 가로채는 방식은 전부 포기한다. 이 컴퓨터/키보드
+        # 환경에서는 그런 방식이 어떤 형태로 하든 평범한 c/v 타이핑까지
+        # 막아버리는 부작용이 있었기 때문이다.
+        #
+        # 대신 키 입력에는 전혀 손대지 않고, OS 클립보드 내용 자체를
+        # 계속 비워서 "복사해도 아무것도 저장되지 않고, 붙여넣어도
+        # 아무것도 나오지 않는" 상태를 만든다. 이러면 Ctrl+C/V든 마우스
+        # 우클릭 메뉴든 어떤 방법으로 복사/붙여넣기를 시도하든 결과적으로
+        # 항상 실패하지만, 글자를 직접 타이핑하는 것과는 완전히 무관하다.
+        self._clipboard_guard()
 
-        # 우클릭 차단
+        # 우클릭 메뉴로 복사/붙여넣기 시도하는 것도 막는다 (키 입력과 무관)
         self.text_area.bind("<Button-3>", lambda e: "break")
 
         # 포커스
         self.text_area.focus_set()
+
+    def _clipboard_guard(self):
+        """클립보드를 주기적으로 비워서 복사/붙여넣기 자체를 무력화한다.
+
+        키 입력을 가로채지 않기 때문에 c, v 같은 일반 타이핑에는
+        전혀 영향을 주지 않는다.
+        """
+        try:
+            self.root.clipboard_clear()
+        except tk.TclError:
+            pass
+        # 0.15초마다 반복 실행 (창이 열려 있는 동안 계속 감시)
+        self.root.after(150, self._clipboard_guard)
 
     # ══════════════════════════════════════════════════════════════════════
     # 글씨 크기 조절
